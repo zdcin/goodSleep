@@ -1,0 +1,7 @@
+bin/classes
+.classpath
+.project
+.settings/
+.apk
+.log
+bin/
