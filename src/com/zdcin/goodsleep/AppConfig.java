@@ -1,6 +1,7 @@
 package com.zdcin.goodsleep;
 
 import android.content.SharedPreferences;
+import android.util.Log;
 
 public class AppConfig {
     
@@ -15,6 +16,7 @@ public class AppConfig {
      * @param config
      */
     public AppConfig(SharedPreferences config) {
+        Log.v("zd", "SharedPreferences.isOn=" + config.getBoolean("isOn", false));
         this.isOn = config.getBoolean("isOn", false);
         this.startHour = config.getInt("startHour", 23);
         this.startMinute = config.getInt("startMinute", 0);
@@ -45,7 +47,7 @@ public class AppConfig {
     public void fillSharedPreferences(SharedPreferences config) {
         config.edit().putBoolean("isOn", this.isOn).putInt("startHour", this.startHour)
                 .putInt("startMinute", this.startMinute).putInt("endHour", this.endHour)
-                .putInt("endMinute", this.endMinute);
+                .putInt("endMinute", this.endMinute).apply();
     }
 
 }

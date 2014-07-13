@@ -30,13 +30,14 @@ public class MainActivity extends Activity {
     /** 给内部类使用的activity this引用 */
     private final MainActivity thisa = this;
 
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         // 1. 启动时从文件中读取设置，根据设置现实界面各个组件的值
         {
+            Log.v("zd", "on MainActivity create.");
             SharedPreferences sharedPreferences = this.getSharedPreferences(Keys.app_config_file.name(), 0);
             AppConfig config = new AppConfig(sharedPreferences);
             TimePicker start = Nocast.findViewById(this, R.id.timePicker1);
@@ -59,6 +60,20 @@ public class MainActivity extends Activity {
                 Switch isOn = Nocast.findViewById(thisa, Switch.class, R.id.switch1);
                 TimePicker start = Nocast.findViewById(thisa, R.id.timePicker1);
                 TimePicker end = Nocast.findViewById(thisa, R.id.timePicker2);
+                //检查起止时间是否一样，一样的话让end比begin早一分钟，这样就可以几乎全天生效
+                if (end.getCurrentHour() == start.getCurrentHour() 
+                            && end.getCurrentMinute() == start.getCurrentMinute()) {
+                   if (end.getCurrentHour() == 0 && end.getCurrentMinute() == 0) {
+                       end.setCurrentHour(23);
+                       end.setCurrentMinute(59);
+                   } else if (end.getCurrentMinute() == 0) {
+                       end.setCurrentHour(end.getCurrentMinute() - 1);
+                       end.setCurrentMinute(59);
+                   } else {
+                        end.setCurrentMinute(end.getCurrentMinute() - 1);
+                   }
+                }
+                
                 AppConfig config = new AppConfig(isOn.isChecked(), start.getCurrentHour(), start.getCurrentMinute(),
                         end.getCurrentHour(), end.getCurrentMinute());
                 // 1 保存设置
@@ -73,28 +88,21 @@ public class MainActivity extends Activity {
                 Log.v("zd", "onQuit");
                 // 2. 关闭窗口
                  thisa.finish();
+//                 thisa.setVisible(false);
             }
         });
     }
 
     private void save(AppConfig config) {
-        //TODO 不应该出现 activety控件相关的东西，使用纯后台逻辑
+        //不应该出现 activety控件相关的东西，使用纯后台逻辑
         Log.v("zd", "save");
         // 1. 变量初始化
         final AlarmManager alarmManager = Nocast.getSystemService(this, Context.ALARM_SERVICE);
 
-//        Switch isOn = Nocast.findViewById(thisa, R.id.switch1);
-//        // Switch isShowOnNotificationBar = Nocast.findViewById(thisa,
-//        // R.id.switch2);
-//        TimePicker start = Nocast.findViewById(thisa, R.id.timePicker1);
-//        TimePicker end = Nocast.findViewById(thisa, R.id.timePicker2);
-//        MyUtils.saveToFile(isOn.isChecked(), false, start.getCurrentHour(), start.getCurrentMinute(),
-//                end.getCurrentHour(), end.getCurrentMinute());
         //2. save to file
         {
             SharedPreferences sp = this.getSharedPreferences(Keys.app_config_file.name(), 0);
-//            AppConfig config = new AppConfig(isOn.isChecked(), start.getCurrentHour(), start.getCurrentMinute(),
-//                    end.getCurrentHour(), end.getCurrentMinute());
+
             config.fillSharedPreferences(sp);
             sp.edit().apply();
         }
@@ -120,13 +128,7 @@ public class MainActivity extends Activity {
             }
         }
         {
-            // Intent endIntent = new
-            // Intent(ActionType.END_GOOD_SLEEP_INTENT_ACTION.action);
-            // this.putVolum(endIntent);
-            // PendingIntent endPi = PendingIntent.getBroadcast(this, 0,
-            // endIntent, 0);
-            // // 结束之前运行的定时任务，如果有的话
-            // alarmManager.cancel(endPi);
+
             PendingIntent endPi = this.getPendingIntentAndCancleBefore(alarmManager,
                     ActionType.END_GOOD_SLEEP_INTENT_ACTION.action);
 
@@ -134,12 +136,6 @@ public class MainActivity extends Activity {
             alarmManager.setRepeating(AlarmManager.RTC, firstRunTime, AlarmManager.INTERVAL_DAY, endPi);
             Log.v("zd", "注册闹钟停止事件，闹钟停止时间：" + new Date(firstRunTime));
         }
-        // {//没用
-        // IntentFilter filter = new IntentFilter();
-        // filter.addAction(this.START_GOOD_SLEEP_INTENT_ACTION);
-        // filter.addAction(this.END_GOOD_SLEEP_INTENT_ACTION);
-        // this.registerReceiver(new AlarmReceiver(), filter);
-        // }
     }
 
     /**
