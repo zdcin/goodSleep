@@ -12,6 +12,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
@@ -74,8 +75,13 @@ public class MainActivity extends Activity {
                    }
                 }
                 
+                //获取生效之前的音量信息
+                final AudioManager audioManager = Nocast.getSystemService(thisa, Context.AUDIO_SERVICE);
+                int oldMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+                int oldRingVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING);
+
                 AppConfig config = new AppConfig(isOn.isChecked(), start.getCurrentHour(), start.getCurrentMinute(),
-                        end.getCurrentHour(), end.getCurrentMinute());
+                        end.getCurrentHour(), end.getCurrentMinute(), oldMusicVolume, oldRingVolume);
                 // 1 保存设置
                 thisa.save(config);
                 // 2. 关闭窗口
@@ -88,7 +94,6 @@ public class MainActivity extends Activity {
                 Log.v("zd", "onQuit");
                 // 2. 关闭窗口
                  thisa.finish();
-//                 thisa.setVisible(false);
             }
         });
     }
@@ -102,17 +107,34 @@ public class MainActivity extends Activity {
         //2. save to file
         {
             SharedPreferences sp = this.getSharedPreferences(Keys.app_config_file.name(), 0);
-
+            //2.1 新的配置生效之前，先要恢复之前的音量设置
+            AppConfig oldConfig = new AppConfig(sp);
+            if (oldConfig.isOn) {
+                Log.v("zd", "新的配置生效之前，先要恢复之前的音量设置, oldConfig.ring=" + oldConfig.oldRingVolume);
+                final AudioManager audioManager = Nocast.getSystemService(thisa, Context.AUDIO_SERVICE);
+                MyUtils.unMuteAll(audioManager, oldConfig.oldRingVolume, oldConfig.oldMusicVolume);
+                config.oldMusicVolume = oldConfig.oldMusicVolume;
+                config.oldRingVolume = oldConfig.oldRingVolume;
+            }
+            //2.2 关闭之前的定时任务, 不管有没有
+            {
+//                this.getPendingIntentAndCancleBefore(alarmManager, ActionType.START_GOOD_SLEEP_INTENT_ACTION.action,
+//                        oldConfig.oldMusicVolume, oldConfig.oldRingVolume);
+//                this.getPendingIntentAndCancleBefore(alarmManager, ActionType.END_GOOD_SLEEP_INTENT_ACTION.action,
+//                        oldConfig.oldMusicVolume, oldConfig.oldRingVolume);
+                this.getPendingIntentAndCancleBefore(alarmManager, ActionType.START_GOOD_SLEEP_INTENT_ACTION.action);
+                this.getPendingIntentAndCancleBefore(alarmManager, ActionType.END_GOOD_SLEEP_INTENT_ACTION.action);
+             // 2. 取消监听电话响铃事件
+                TelephonyManager tm = Nocast.getSystemService(this, Context.TELEPHONY_SERVICE);
+                ActionType.MyPhoneStateListener.cancel(tm);
+            }
             config.fillSharedPreferences(sp);
-            sp.edit().apply();
         }
         // 3. 检查是否关闭service
         if (!config.isOn) {
-            this.getPendingIntentAndCancleBefore(alarmManager, ActionType.START_GOOD_SLEEP_INTENT_ACTION.action);
-            this.getPendingIntentAndCancleBefore(alarmManager, ActionType.END_GOOD_SLEEP_INTENT_ACTION.action);
-
             return;
         }
+        
         // 4. 注册自定义的闹钟事件
         {
             PendingIntent beginPi = this.getPendingIntentAndCancleBefore(alarmManager,
@@ -128,7 +150,6 @@ public class MainActivity extends Activity {
             }
         }
         {
-
             PendingIntent endPi = this.getPendingIntentAndCancleBefore(alarmManager,
                     ActionType.END_GOOD_SLEEP_INTENT_ACTION.action);
 
@@ -175,20 +196,12 @@ public class MainActivity extends Activity {
      */
     private PendingIntent getPendingIntentAndCancleBefore(AlarmManager alarmManager, String actionStr) {
         Intent intent = new Intent(actionStr);
-        this.putVolum(intent);
+//        intent.putExtra(Keys.ring_volum.name(), oldMusicVolume);
+//        intent.putExtra(Keys.music_volum.name(), oldRingVolume);
         PendingIntent pi = PendingIntent.getBroadcast(this, 0, intent, 0);
         // 结束之前运行的定时任务，如果有的话
         alarmManager.cancel(pi);
         return pi;
     }
     
-    private void putVolum(Intent intent) {
-        final AudioManager audioManager = Nocast.getSystemService(this, Context.AUDIO_SERVICE);
-        final int OLD_MUSIC_VOLUME = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        final int OLD_RING_VOLUME = audioManager.getStreamVolume(AudioManager.STREAM_RING);
-        
-        intent.putExtra(Keys.ring_volum.name(), OLD_RING_VOLUME);
-        intent.putExtra(Keys.music_volum.name(), OLD_MUSIC_VOLUME);
-    }
-
 }

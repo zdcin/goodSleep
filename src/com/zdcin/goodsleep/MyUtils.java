@@ -24,11 +24,7 @@ public class MyUtils {
     }
     
     public static void unMuteAll(AudioManager audioManager, int ring, int music) {
-        // int maxRing =
-        // audioManager.getStreamMaxVolume(AudioManager.STREAM_RING);
         audioManager.setStreamVolume(AudioManager.STREAM_RING, ring, 63);
-        // int maxMusic =
-        // audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, music, 63);
     }
 }

@@ -4,6 +4,7 @@ import com.zdcin.androidtool.Nocast;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
@@ -26,15 +27,18 @@ public enum ActionType {
 
             // 1. 把铃声和音乐静音，记录之前值
             final AudioManager audioManager = Nocast.getSystemService(context, Context.AUDIO_SERVICE);
-
-            final int OLD_MUSIC_VOLUME = intent.getIntExtra(Keys.music_volum.name(), 0);
-            final int OLD_RING_VOLUME = intent.getIntExtra(Keys.ring_volum.name(), 0);
+            
+//            final int OLD_MUSIC_VOLUME = intent.getIntExtra(Keys.music_volum.name(), 0);
+//            final int OLD_RING_VOLUME = intent.getIntExtra(Keys.ring_volum.name(), 0);
+            
+            SharedPreferences sp = context.getSharedPreferences(Keys.app_config_file.name(), 0);
+            AppConfig oldConfig = new AppConfig(sp);
             MyUtils.muteAll(audioManager);
             Log.v("zd", "静音铃声和音乐");
 
             // 2. 注册电话响铃事件，响铃时，把铃声音量恢复, 注册电话挂断事件，挂断后，把铃声静音
             TelephonyManager tm = Nocast.getSystemService(context, Context.TELEPHONY_SERVICE);
-            tm.listen(MyPhoneStateListener.get(audioManager, OLD_RING_VOLUME, OLD_MUSIC_VOLUME),
+            tm.listen(MyPhoneStateListener.get().setValue(audioManager, oldConfig.oldRingVolume, oldConfig.oldMusicVolume),
                     PhoneStateListener.LISTEN_CALL_STATE);
         }
     },
@@ -47,15 +51,18 @@ public enum ActionType {
             // 1. 把铃声和音乐音量恢复
             final AudioManager audioManager = Nocast.getSystemService(context, Context.AUDIO_SERVICE);
 
-            final int OLD_MUSIC_VOLUME = intent.getIntExtra(Keys.music_volum.name(), 0);
-            final int OLD_RING_VOLUME = intent.getIntExtra(Keys.ring_volum.name(), 0);
-            MyUtils.unMuteAll(audioManager, OLD_RING_VOLUME, OLD_MUSIC_VOLUME);
+//            final int OLD_MUSIC_VOLUME = intent.getIntExtra(Keys.music_volum.name(), 0);
+//            final int OLD_RING_VOLUME = intent.getIntExtra(Keys.ring_volum.name(), 0);
+            SharedPreferences sp = context.getSharedPreferences(Keys.app_config_file.name(), 0);
+            AppConfig oldConfig = new AppConfig(sp);
+            MyUtils.unMuteAll(audioManager, oldConfig.oldRingVolume, oldConfig.oldMusicVolume);
             Log.v("zd", "恢复铃声和音乐");
 
             // 2. 取消监听电话响铃事件
             TelephonyManager tm = Nocast.getSystemService(context, Context.TELEPHONY_SERVICE);
-            tm.listen(MyPhoneStateListener.get(audioManager, OLD_RING_VOLUME, OLD_MUSIC_VOLUME),
-                    PhoneStateListener.LISTEN_NONE);
+//            tm.listen(MyPhoneStateListener.get(audioManager, OLD_RING_VOLUME, OLD_MUSIC_VOLUME),
+//                    PhoneStateListener.LISTEN_NONE);
+            MyPhoneStateListener.cancel(tm);
         }
     };
 
@@ -90,26 +97,34 @@ public enum ActionType {
      */
     public abstract void onReceive(Context context, Intent intent);
 
-    private static class MyPhoneStateListener extends PhoneStateListener {
+    public static class MyPhoneStateListener extends PhoneStateListener {
         private static MyPhoneStateListener i;
 
-        public static synchronized MyPhoneStateListener get(AudioManager audioManager, int OLD_RING_VOLUME,
-                int OLD_MUSIC_VOLUME) {
+        public static synchronized MyPhoneStateListener get() {
             if (i == null) {
-                i = new MyPhoneStateListener(audioManager, OLD_RING_VOLUME, OLD_MUSIC_VOLUME);
+                i = new MyPhoneStateListener();
             }
             return i;
         }
+        
+        public static void cancel(TelephonyManager tm) {
+            if (i != null) {
+                tm.listen(i, PhoneStateListener.LISTEN_NONE);
+            }
+        }
 
-        final AudioManager audioManager;
+        private AudioManager audioManager;
 
-        final int OLD_MUSIC_VOLUME;
-        final int OLD_RING_VOLUME;
+        private int OLD_MUSIC_VOLUME;
+        private int OLD_RING_VOLUME;
 
-        private MyPhoneStateListener(AudioManager audioManager, int OLD_RING_VOLUME, int OLD_MUSIC_VOLUME) {
+        private MyPhoneStateListener() {
+        }
+        public MyPhoneStateListener setValue(AudioManager audioManager, int OLD_RING_VOLUME, int OLD_MUSIC_VOLUME) {
             this.audioManager = audioManager;
             this.OLD_RING_VOLUME = OLD_RING_VOLUME;
             this.OLD_MUSIC_VOLUME = OLD_MUSIC_VOLUME;
+            return this;
         }
 
         @Override
